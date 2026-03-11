@@ -1,0 +1,28 @@
+{
+  "name": "opengravity",
+  "version": "1.0.0",
+  "description": "Personal AI Agent running locally with Telegram interface",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "dotenv": "^16.4.5",
+    "elevenlabs": "^1.59.0",
+    "firebase-admin": "^13.7.0",
+    "glob": "^13.0.6",
+    "googleapis": "^171.4.0",
+    "grammy": "^1.31.0",
+    "groq-sdk": "^0.8.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
