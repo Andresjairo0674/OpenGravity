@@ -6,22 +6,41 @@ import readline from 'readline';
 import os from 'os';
 
 /**
- * Si se proporciona GOOGLE_SERVICE_ACCOUNT_BASE64, decodifica el JSON y lo
- * escribe en un archivo temporal, luego apunta GOOGLE_APPLICATION_CREDENTIALS a él.
- * Esto evita problemas de escaping al pasar secrets en entornos cloud.
+ * Configura las credenciales de Google de forma segura:
+ * 1. Si GOOGLE_SERVICE_ACCOUNT_BASE64 está definido, decodifica y usa ese.
+ * 2. Si GOOGLE_APPLICATION_CREDENTIALS apunta a un archivo, valida que sea JSON válido.
+ * 3. Si el archivo no existe o está corrupto, limpia la variable para no crashear el bot.
  */
 export async function setupGoogleCredentials(): Promise<void> {
+  // Opción 1: Cargar desde base64 (método recomendado para cloud)
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;
-  if (b64 && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  if (b64) {
     try {
       const json = Buffer.from(b64, 'base64').toString('utf-8');
-      const tmpPath = path.join(os.tmpdir(), 'service-account.json');
+      JSON.parse(json); // Validar que sea JSON válido antes de escribir
+      const tmpPath = path.join(os.tmpdir(), 'sa-opengravity.json');
       await fs.writeFile(tmpPath, json, 'utf-8');
       process.env.GOOGLE_APPLICATION_CREDENTIALS = tmpPath;
-      console.log('🔑 Credenciales de Google cargadas desde GOOGLE_SERVICE_ACCOUNT_BASE64');
+      console.log('🔑 Credenciales de Google cargadas desde variable base64.');
+      return;
     } catch (err) {
-      console.error('❌ Error decodificando GOOGLE_SERVICE_ACCOUNT_BASE64:', err);
+      console.warn('⚠️ GOOGLE_SERVICE_ACCOUNT_BASE64 no es JSON válido, ignorando.');
     }
+  }
+
+  // Opción 2: Validar archivo existente (puede ser un secret file corrupto de Render)
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credPath) {
+    try {
+      const content = await fs.readFile(credPath, 'utf-8');
+      JSON.parse(content); // Validar JSON
+      console.log(`🔑 Credenciales de Google cargadas desde archivo: ${credPath}`);
+    } catch (err) {
+      console.warn(`⚠️ GOOGLE_APPLICATION_CREDENTIALS apunta a un archivo inválido o inexistente (${credPath}). Las funciones de Google no estarán disponibles.`);
+      delete process.env.GOOGLE_APPLICATION_CREDENTIALS; // Limpiar para evitar crash
+    }
+  } else {
+    console.log('ℹ️ Sin credenciales de Google configuradas. Las funciones de Google/Firebase no estarán disponibles.');
   }
 }
 
