@@ -3,6 +3,27 @@ import path from 'path';
 import process from 'process';
 import { google } from 'googleapis';
 import readline from 'readline';
+import os from 'os';
+
+/**
+ * Si se proporciona GOOGLE_SERVICE_ACCOUNT_BASE64, decodifica el JSON y lo
+ * escribe en un archivo temporal, luego apunta GOOGLE_APPLICATION_CREDENTIALS a él.
+ * Esto evita problemas de escaping al pasar secrets en entornos cloud.
+ */
+export async function setupGoogleCredentials(): Promise<void> {
+  const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64;
+  if (b64 && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try {
+      const json = Buffer.from(b64, 'base64').toString('utf-8');
+      const tmpPath = path.join(os.tmpdir(), 'service-account.json');
+      await fs.writeFile(tmpPath, json, 'utf-8');
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = tmpPath;
+      console.log('🔑 Credenciales de Google cargadas desde GOOGLE_SERVICE_ACCOUNT_BASE64');
+    } catch (err) {
+      console.error('❌ Error decodificando GOOGLE_SERVICE_ACCOUNT_BASE64:', err);
+    }
+  }
+}
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',

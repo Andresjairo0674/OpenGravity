@@ -14,9 +14,11 @@ const envSchema = z.object({
   GROQ_API_KEY: z.string().min(1, "La clave de Groq es obligatoria"),
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_MODEL: z.string().default('openrouter/free'),
-  ELEVENLABS_API_KEY: z.string().min(1, "La clave de ElevenLabs es obligatoria"),
+  ELEVENLABS_API_KEY: z.string().optional(),
   DB_PATH: z.string().default('./memory.db'),
-  GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1, "La ruta a las credenciales de Firebase es obligatoria")
+  // Credenciales de Google: se puede usar ruta de archivo O base64 (recommended para cloud)
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+  GOOGLE_SERVICE_ACCOUNT_BASE64: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);

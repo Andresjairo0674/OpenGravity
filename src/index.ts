@@ -1,9 +1,13 @@
 import { config } from './config.js';
 import { bot } from './bot/telegram.js';
 import { SkillsManager } from './agent/skills_manager.js';
+import { setupGoogleCredentials } from './google/auth.js';
 import http from 'http';
 
 async function bootstrap() {
+  // Configurar credenciales de Google desde base64 (para entornos cloud como Render)
+  await setupGoogleCredentials();
+
   // Servidor HTTP básico para satisfacer el health check de Render
   const port = process.env.PORT || 3000;
   http.createServer((req, res) => {
