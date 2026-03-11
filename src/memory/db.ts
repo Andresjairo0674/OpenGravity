@@ -1,71 +1,61 @@
-import admin from 'firebase-admin';
+import Database from 'better-sqlite3';
 import { config } from '../config.js';
+import path from 'path';
+import fs from 'fs';
 
-// Inicializar Firebase Admin SDK (Usa internamente la variable de entorno GOOGLE_APPLICATION_CREDENTIALS)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
+// Asegurarse de que el directorio de la base de datos exista
+const dbDir = path.dirname(config.DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
-export const db = admin.firestore();
+const db = new Database(config.DB_PATH);
+
+// Crear tabla de mensajes si no existe
+db.exec(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
 
 export interface MessageRow {
-  id?: string;
+  id?: number;
   userId: number;
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
-  createdAt: string | number;
+  createdAt: string;
 }
 
 export const memory = {
   addMessage: async (userId: number, role: 'user' | 'assistant' | 'system' | 'tool', content: string) => {
-    const messagesRef = db.collection('messages');
-    await messagesRef.add({
-      userId,
-      role,
-      content,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    const stmt = db.prepare(
+      'INSERT INTO messages (userId, role, content, createdAt) VALUES (?, ?, ?, ?)'
+    );
+    stmt.run(userId, role, content, new Date().toISOString());
   },
-  
-  getMessages: async (userId: number, limitCount?: number): Promise<MessageRow[]> => {
-    let query = db.collection('messages')
-      .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc'); // Ordenamos de forma descendente para obtener los más recientes
-      
-    if (limitCount) {
-      query = query.limit(limitCount);
-    }
 
-    const snapshot = await query.get();
-    
-    const rows: MessageRow[] = [];
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      rows.push({
-        id: doc.id,
-        userId: data.userId,
-        role: data.role,
-        content: data.content,
-        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-      });
-    });
-    
-    // Retornamos en orden cronológico ascendente (el más viejo primero)
-    return rows.reverse();
+  getMessages: async (userId: number, limitCount?: number): Promise<MessageRow[]> => {
+    let stmt;
+    if (limitCount) {
+      stmt = db.prepare(
+        'SELECT * FROM messages WHERE userId = ? ORDER BY id DESC LIMIT ?'
+      );
+      const rows = stmt.all(userId, limitCount) as MessageRow[];
+      return rows.reverse();
+    } else {
+      stmt = db.prepare(
+        'SELECT * FROM messages WHERE userId = ? ORDER BY id ASC'
+      );
+      return stmt.all(userId) as MessageRow[];
+    }
   },
 
   clearMemory: async (userId: number) => {
-    const snapshot = await db.collection('messages').where('userId', '==', userId).get();
-    
-    if (snapshot.empty) return;
-
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
+    const stmt = db.prepare('DELETE FROM messages WHERE userId = ?');
+    stmt.run(userId);
   }
 };
